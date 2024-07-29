@@ -1,0 +1,516 @@
+body{
+	margin: 0px;
+	padding:0px;
+	    box-sizing: border-box;
+	     font-family: 'Raleway', sans-serif;
+}
+.no-padding{
+	padding: 0px;
+}
+img{
+	max-width: 100%;
+}
+.color-blue{
+	color: #00c0ef;
+}
+.top_bar{
+	background: #000;
+	padding: 20px 0px;
+}
+.top_bar a h1{
+	color: #fff;
+	font-size: 34px;
+	text-transform: uppercase;
+	margin: 0px;
+}
+.left_sidebar {
+	border-right: 1px solid #eee;
+	border-left: 1px solid #eee;
+	min-height: 100vh;
+	padding-top: 20px;
+}
+.left_sidebar .personal_data .img_person{
+	width: 150px;
+	height: 150px;
+	border-radius: 100%;
+	overflow: hidden;
+	margin: 0px auto;
+}
+.name_client{
+	margin: 10px 0px 20px;
+}
+.left_sidebar .listing_options ul{
+	padding: 0px;
+}
+.left_sidebar .listing_options ul li{
+	width: 100%;
+	display: block;
+	float: left;
+
+}
+.left_sidebar .listing_options ul li a:first-child{
+	border-top: 1px solid #eee;
+}
+.left_sidebar .listing_options ul li a{
+	padding: 12px 15px;
+	border-bottom: 1px solid #eee;
+	width: 100%;
+	float: left;
+	color: #666;
+	
+	font-size: 16px;
+	text-transform: capitalize;
+	transition: all 400ms ease;
+}
+.left_sidebar .listing_options ul li a:hover{
+	color: #fff;
+	background: #00c0ef;
+	text-decoration: none;
+	transition: all 400ms ease;
+}
+.left_sidebar .listing_options .search_icon{
+	 width: 50px;
+    float: left;
+    padding: 20px 0px;
+    text-align: center;
+    font-size: 25px;
+    padding-bottom: 0px;
+
+}
+.left_sidebar .listing_options .lost_something{
+	padding-top: 20px;
+	    float: left;
+    width: 200px;
+}
+.left_sidebar .listing_options .lost_something a{
+	color: #00c0ef;
+	float: left;
+	margin-bottom: 5px;
+	width: 100%;
+}
+.left_sidebar .listing_options .lost_something span{
+	width: 100%;
+	font-size: 10px;
+}
+.right_content{
+	padding-top: 20px;
+	border:1px solid #eee;
+}
+.right_content .title_main h2{
+	text-align: left;
+	margin: 0px 0px 5px;
+	   
+	    text-transform: uppercase;
+	    color: #000;
+}
+.right_content .title_main:after{
+	    content: '';
+    width: 70px;
+    height: 2px;
+    background: #00c0ef;
+    /* float: left; */
+    margin-bottom: 40px;
+    /* margin: 0px auto 30px; */
+    display: block;
+}
+.right_content .tag_line{
+	border-bottom: 1px solid #eee;
+	border-top: 1px solid #eee;
+	padding: 18px 5px;
+
+
+}
+.right_content .tag_line h4{
+	margin: 0px;
+	font-weight: bold;
+}
+
+.right_content .main_form .border_bottom{
+	padding: 18px 5px;
+	border-bottom: 1px solid #eee;
+	
+}
+.right_content .main_form label{
+	margin: 0px;
+}
+.right_content .main_form .img_form{
+	max-width: 70px;
+	height: 70px;
+	border-radius: 100%;
+	overflow: hidden;
+}
+.photo_text label{
+	line-height: 60px;
+}
+.btn-submit button{
+	text-transform: uppercase;
+    font-size: 18px;
+   
+    padding: 10px 30px;
+    background: #00c0ef;
+    border: 1px solid #00c0ef;
+    color: #fff;
+    margin-top: 6px;
+    transition: all 400ms ease;
+}
+.btn-submit button:hover{
+	background: #000;
+    color: #fff;
+    border: 1px solid #000;
+    transition: all 400ms ease;
+}
+.trip_table table{
+	border: 1px solid #eee;
+}
+.right_content .trip_table thead{
+	border:1px solid #ccc;
+}
+.right_content .trip_table table th{
+	    padding: 15px 5px;
+	    	border-bottom:1px solid #ccc;
+	    /* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#eeeeee+0,cccccc+100;Gren+3D */
+background: #eeeeee; /* Old browsers */
+background: -moz-linear-gradient(top, #eeeeee 0%, #cccccc 100%); /* FF3.6-15 */
+background: -webkit-linear-gradient(top, #eeeeee 0%,#cccccc 100%); /* Chrome10-25,Safari5.1-6 */
+background: linear-gradient(to bottom, #eeeeee 0%,#cccccc 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#eeeeee', endColorstr='#cccccc',GradientType=0 ); /* IE6-9 */
+}
+.trip_table tr.active + tr.admin_profile {
+    display: table-row;
+        background: #f9f9f9;
+}
+
+.trip_table tr.active + tr.admin_profile:hover{
+	background: #f9f9f9;
+	cursor: default;
+}
+.admin_profile {
+    display: none;
+}
+.trip_table tr.active .btn_profile .red-btn {
+    display: block;
+}
+.trip_table tr.active .btn_profile .dark-btn {
+    display: none;
+}
+.trip_table tr .btn_profile .red-btn {
+    display: none;
+}
+.number{
+	font-family: arial
+}
+.trip_table{
+	margin: 20px 0px;
+}
+.trip_table tbody tr{
+	border-bottom: 1px solid #eee;
+}
+.trip_table tbody tr td{
+	padding: 15px 5px;
+}
+.trip_table tbody tr td .btn_profile .fa{
+	font-size: 20px;
+	color: #00c0ef;
+	cursor: pointer;
+	padding: 0px 10px;
+}
+.profile_info{
+	border-right: 1px solid #eee;
+}
+.profile_info h2.price{
+	text-align: center;
+	margin: 0px 0px;
+	font-size: 25px;
+}
+.profile_info .crad_info{
+	width: 100%;
+	float: left;
+	text-align: center;
+	padding-bottom: 20px;
+	padding-top: 5px;
+}
+.profile_info .crad_info .fa-credit-card{
+	font-size: 20px;
+	color: #ccc!important;
+}
+.profile_info .crad_info .fa{
+	color: #333;
+	margin-left: 5px
+}
+.date_time {
+	    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    overflow: hidden;
+    float: left;
+    width: 100%;
+    font-size: 10px;
+    padding: 10px 0px;
+}
+.date_time p{
+	margin: 0px;
+}
+.destination{
+	   overflow: hidden;
+    float: left;
+    width: 100%;
+       padding: 5px 0px;
+
+}
+.destination .from{
+	margin: 5px 0px;
+	float: left;
+	width: 100%;
+}
+.destination .from .dots_green{
+	float: left;
+    width: 10%;
+    color: #27AA0B;
+    font-size: 16px;
+
+}
+.destination .from .area{
+	float: left;
+    width: 90%;
+   }
+ .destination .from .area .number {
+   	    float: left;
+    width: 100%;
+    color: #333;
+  }
+   .destination .from .area .address {
+       float: left;
+    width: 100%;
+    color: #666;
+    font-size: 10px;
+    margin-top: 3px;
+  }
+  .dots_red{
+  	color: #F32F00;
+  	float: left;
+    width: 10%;
+   
+    font-size: 16px;
+  }
+  .buttons_detail{
+  	padding-top: 80px;
+  }
+    .buttons_detail .select_stars{
+  	    width: 100%;
+    text-align: center;
+    padding-bottom: 20px;
+    font-size: 18px;
+    color: #666;
+  }
+ .buttons_detail .rate_btns button{
+ 	    text-transform: uppercase;
+    font-size: 11px;
+    width: 100%;
+    line-height: 36px;
+    background: #00c0ef;
+    border: 1px solid #00c0ef;
+    color: #fff;
+    margin-top: 6px;
+    transition: all 400ms ease;
+ }
+  .buttons_detail .rate_btns button span{
+ 	    float: left;
+    width: 20%;
+    height: 36px;
+    font-size: 17px;
+    line-height: 36px;
+    border-right: 1px solid #03a2ca;
+ }
+  .buttons_detail .rate_btns button:hover{
+  	background: #000;
+  	  transition: all 400ms ease;
+
+  }
+  .dt_trip{
+  	color: #666;
+  }
+  .view_btn .buttons_detail {
+    padding-top: 0;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    padding: 10px 0px;
+}
+  .view_btn .buttons_detail .rate_btns button {
+    text-transform: uppercase;
+    font-size: 11px;
+    width: auto;
+    line-height: 36px;
+    background: #00c0ef;
+    border: 1px solid #00c0ef;
+    color: #fff;
+    margin-top: 6px;
+    transition: all 400ms ease;
+    
+    padding: 0px 6px;
+    margin: 0px 10px;
+        width: 159px;
+}
+  .view_btn .buttons_detail .rate_btns button:hover{
+  	background: #000;
+  }
+  .map_loct.view{
+  	    background: #f7f7f7;
+    border: 1px solid #eee;
+    float: left;
+    width: 100%;
+  }
+  .map_loct.view .destination{
+  	padding: 10px 10px;
+  }
+   .map_loct.view .bottom_desc {
+   	 border-top: 1px solid #eee;
+  }
+     .map_loct.view .bottom_desc span{
+     	    float: left;
+    width: 100%;
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+    padding: 5px 0px 0px;
+     }
+  .fare_break h3{
+  	text-align: center;
+  	margin: 0px;
+  }
+  .bill hr{
+  	    margin-top: 10px;
+    margin-bottom: 10px;
+        float: left;
+    width: 100%;
+  }
+    .bill ul{
+    	padding: 0px;
+
+    }
+    .bill ul li{
+    	display: block;
+    	float: left;
+    	width: 50%;
+    	    padding: 6px 0px;
+    	    font-size: 15px;
+    	    color: #666;
+    }
+  .bill ul li:nth-child(even){
+  	text-align: right;
+  }
+    .bill ul li.bold{
+    	text
+    }
+    .bill ul li.text-left{
+    	text-align: left;
+    }
+      .bill ul li.text-right{
+      	text-align: right;
+      }
+    .bill ul li.bold{
+    	    font-size: 17px;
+    color: #000;
+        font-weight: bold;
+    }
+   .bill ul li.bold.subtotal{
+   	  font-size: 20px;
+   }
+   .bill ul li.small{
+   	font-size: 12px;
+   }
+   .view_btn{
+   	margin-bottom: 30px;
+   }
+  .men_detail{
+  	border-bottom: 1px solid #eee;
+  	border-top: 1px solid #eee;
+  	padding: 15px 0px;
+  	margin:30px 0px;
+  }
+  .men_detail h4{
+  	text-transform: uppercase;
+  	color: #000;
+  	font-size: 13px;
+  	line-height: 40px;
+  }
+    .men_detail h4.fade-text{
+    	color: #666;
+    }
+   .men_detail .img_form {
+    max-width: 70px;
+    height: 70px;
+    border-radius: 100%;
+    overflow: hidden;
+}
+ .men_detail .select_stars{
+ 		    line-height: 59px;
+ 		        font-size: 20px;
+ }
+.header_options button{
+	    background: transparent;
+    border: 1px solid #fff;
+}
+.header_options button .fa{
+	    padding: 0px 10px 0px 0px;
+}
+.header_options button:hover{
+	    background: #00c0ef;
+    border: 1px solid #00c0ef;
+}
+.header_options .dropdown-menu{
+	    min-width: 250px;
+
+}
+.header_options .dropdown-menu .user_name{
+	padding: 10px;
+	margin-bottom: 10px;
+	overflow: hidden;
+}
+.header_options .dropdown-menu .user_name .user_img{
+	    width: 20%;
+    float: left;
+}
+.header_options .dropdown-menu .user_name .user_title{
+	 width: 80%;
+    float: left;
+    padding: 0px 0px 0px 12px;
+    font-weight: bold;
+    font-size: 15px;
+}
+.header_options .dropdown-menu li{
+	float: left;
+	width: 100%;
+
+	    border-bottom: 1px solid #eee;
+
+}
+.header_options .dropdown-menu li a{
+	color: #666;
+	 transition: all 400ms ease;
+	 	padding: 8px 10px;
+}
+.header_options .dropdown-menu li.red a{
+	background: #F32F00;
+	color: #fff;
+
+}
+.header_options .dropdown-menu li.red a:hover{
+	background: #d22b03;
+}
+.header_options .dropdown-menu li a:hover{
+	    color: #fff;
+    background: #00c0ef;
+    text-decoration: none;
+    transition: all 400ms ease;
+}
+.header_options .dropdown-menu li.active a{
+	color: #fff;
+	  background: #00c0ef;
+}
+.header_options .dropdown-menu li.first{
+	    border-top: 1px solid #eee;
+}
+.open>.dropdown-toggle.btn-primary {
+    color: #000;
+    background-color: #ffffff;
+    border-color: #ffffff;
+}

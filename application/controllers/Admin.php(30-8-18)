@@ -1,0 +1,1493 @@
+<?php
+defined('BASEPATH') OR exit('No direct script access allowed');
+
+class Admin extends CI_Controller
+{
+  public function __construct()
+  {
+    parent::__construct();
+    $this->load->library(array('session', 'form_validation'));
+    $this->load->helper(array('url', 'form', 'captcha', 'form'));
+    $this->load->model(array('user_model', 'type_model', 'price_model', 'order_model', 'review_model', 'page_model', 'content_model', 'coupon_model', 'promotion_model', 'service_model', 'payment_model'));
+    if ( !$this->session->userdata('logged_in') ) {
+      redirect('/');
+    }
+    if ( $this->session->userdata('level') == 2 ) {
+      redirect('locksmith');
+    } else if ( $this->session->userdata('level') == 3 ) {
+      redirect('customer');
+    }
+  }
+
+  public function index()
+  {
+    $newcustomers = $this->user_model->getNewCustomers();
+    $newlocksmiths = $this->user_model->getNewLocksmiths();
+    $newreviews = $this->review_model->getNewReviews();
+    $neworders = $this->order_model->getNew();
+    $lastorders = $this->order_model->getLast4CustomerOrders();
+    $monthsOrder = $this->order_model->getMonthsOrders();
+    $paymentCustomer = $this->order_model->getAllPayments();
+    $paymentLocksmith = $this->payment_model->getCompletedPayments();
+    
+    $array = array();$array2 = array();
+
+    foreach ( $monthsOrder['completed'] as $monhlycomplete ) {
+      $array[$monhlycomplete['month'].$monhlycomplete['year']]['period'] = $monhlycomplete['year']."-".$monhlycomplete['month'];
+      $array[$monhlycomplete['month'].$monhlycomplete['year']]['completed'] = $monhlycomplete['total'];
+    }
+    foreach ( $monthsOrder['accepted'] as $monhlyaccepted ) {
+      $array[$monhlyaccepted['month'].$monhlyaccepted['year']]['period'] = $monhlyaccepted['year']."-".$monhlyaccepted['month'];
+      $array[$monhlyaccepted['month'].$monhlyaccepted['year']]['accepted'] = $monhlyaccepted['total'];
+    }
+    foreach ( $monthsOrder['pending'] as $monhlypending ) {
+      $array[$monhlypending['month'].$monhlypending['year']]['period'] = $monhlypending['year']."-".$monhlypending['month'];
+      $array[$monhlypending['month'].$monhlypending['year']]['pending'] = $monhlypending['total'];
+    }
+    ksort($array);
+    foreach ( $array as $arr ) {
+      $array2[] = $arr;
+    }
+
+    if ( !$paymentLocksmith->amount ) {
+      $paymentLocksmith->amount = 0;
+    }
+    if ( !$paymentCustomer->price ) {
+      $paymentCustomer->price = 0;
+    }
+    $total = (int) $paymentCustomer->price + (int) $paymentLocksmith->amount;
+
+    $data = new stdClass();
+    $data->locksmith = count($newlocksmiths);
+    $data->customer = count($newcustomers);
+    $data->order = count($neworders);
+    $data->review = count($newreviews);
+    $data->lastorders = $lastorders;
+    $data->newreviews = $newreviews;
+    $data->monthorders = $array2;
+    $data->payments = array(
+      'total' => $total,
+      'cust' => $paymentCustomer->price,
+      'lock' => $paymentLocksmith->amount
+    );
+    $this->load->view('header');
+    $this->load->view('admin/index', $data);
+    $this->load->view('footer');
+  }
+
+  public function profile()
+  {
+    $user_id = $this->session->userdata('user_id');
+    $user = $this->user_model->get_user($user_id);
+    $this->load->view('header');
+    $this->load->view('admin/profile', $user);
+    $this->load->view('footer');
+  }
+
+  public function locksmith()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/locksmith');
+    $this->load->view('footer');
+  }
+
+  public function getlocksmith()
+  {
+    $locksmiths = $this->user_model->getAllLocksmith();
+    $all = $this->user_model->count_all_lock();
+
+    $data = array();
+    $no = $_POST['start'];
+
+    foreach ( $locksmiths as $locksmith ) {
+      $no++;
+      $row = array();
+      $row[] = $locksmith['id'];
+      $row[] = $locksmith['name'];
+      $row[] = $locksmith['email'];
+      $row[] = $locksmith['contact_no'];
+      $row[] = $locksmith['address'];
+      $row[] = '<a href="'.base_url().'admin/prices/'.$locksmith['id'].'">Prices</a> | <a href="'.base_url().'admin/editlocksmith/'.$locksmith['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteLocksmith('.$locksmith['id'].');">Delete</a>';
+      $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function addlocksmith()
+  {
+    // create the data object
+    $data = new stdClass();
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('email', 'Email', 'trim|required|valid_email');
+    $this->form_validation->set_rules('password', 'Password', '');
+    $this->form_validation->set_rules('contact_no', 'Contact Number', 'trim');
+    $this->form_validation->set_rules('address', 'Address', 'trim');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/addlocksmith');
+      $this->load->view('footer');
+    } else {
+      $data->email = $this->input->post('email');
+      if ( !empty( $this->input->post('password') ) ) {
+        $data->password = $this->input->post('password');
+      }
+      $data->name = $this->input->post('name');
+      $data->contact_no = $this->input->post('contact_no');
+      $data->address = $this->input->post('address');
+      $data->creation_date = date("Y-m-d H:i:s", strtotime("now"));
+      $data->level = 2;
+      $data->status = 1;
+      if ( $this->user_model->create_user($data) ) {
+        $data->success = "Locksmith added successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/addlocksmith', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/addlocksmith', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function editlocksmith()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $locksmith = $this->user_model->get_user($id);
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('email', 'Email', 'trim|required|valid_email');
+    $this->form_validation->set_rules('password', 'Password', '');
+    $this->form_validation->set_rules('contact_no', 'Contact Number', 'trim');
+    $this->form_validation->set_rules('address', 'Address', 'trim');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/editlocksmith', $locksmith);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->email = $this->input->post('email');
+      if ( !empty( $this->input->post('password') ) ) {
+        $data->password = $this->input->post('password');
+      }
+      $data->name = $this->input->post('name');
+      $data->contact_no = $this->input->post('contact_no');
+      $data->address = $this->input->post('address');
+      if ($id = $this->user_model->update_user($data)) {
+        $data->success = "LockSmith edited successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/editlocksmith', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/editlocksmith', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function prices()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $data->locksmith = $locksmith = $this->user_model->get_user($id);
+
+    $this->load->view('header');
+    $this->load->view('admin/prices', $data);
+    $this->load->view('footer');
+  }
+
+  public function getprice()
+  {
+    $id = $this->uri->segment(3);
+    $prices = $this->price_model->get_allprices($id);
+    $all = $this->price_model->count_lock_all($id);
+
+    $data = array();
+    $no = $_POST['start'];
+
+    foreach ( $prices as $price ) {
+      $no++;
+      $eve_price = ''; $week_price = '';
+      if ( $price['eve_method'] == 'plus' ) {
+        $eve_price = $price['price'] + $price['eve_price'];
+      } else if ( $price['eve_method'] == 'percent' ) {
+        $eve_price = $price['price'] + ($price['price']*$price['eve_price']/100);
+      }
+      if ( $price['week_method'] == 'plus' ) {
+        $week_price = $price['price'] + $price['week_price'];
+      } else if ( $price['week_method'] == 'percent' ) {
+        $week_price = $price['price'] + ($price['price']*$price['week_price']/100);
+      }
+      
+      $row = array();
+      $row[] = $price['price_id'];
+      $row[] = $price['name'];
+      $row[] = $price['price'];
+      $row[] = $eve_price;
+      $row[] = $week_price;
+      $row[] = '<a href="'.base_url().'admin/editprice/'.$price['price_id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deletePrice('.$price['price_id'].');">Delete</a>';
+      $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function editprice()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $data->prices = $price = $this->price_model->get_price($id);
+    $data->types = $type = $this->type_model->getAllTypes();
+
+    // set validation rules
+    $this->form_validation->set_rules('price', 'Price', 'required|numeric');
+    $this->form_validation->set_rules('type_id', 'Type', '');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/editprice', $data);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->price = $this->input->post('price');
+      $data->type_id = $this->input->post('type_id');
+      $data->eve_method = $this->input->post('eve_method');
+      $data->eve_price = $this->input->post('eve_price');
+      $data->week_method = $this->input->post('week_method');
+      $data->week_price = $this->input->post('week_price');
+      if ($id = $this->price_model->updateprice($data)) {
+        $data->success = "Price updated successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/editprice', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/editprice', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function deleteprice()
+  {
+    $id = $this->uri->segment(3);
+    $this->price_model->deleteprice($id);
+    exit;
+  }
+
+  public function deletelocksmith()
+  {
+    $id = $this->uri->segment(3);
+    $this->user_model->deleteuser($id);
+    exit;
+  }
+
+  public function customer()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/customer');
+    $this->load->view('footer');
+  }
+
+  public function getcustomer()
+  {
+    $customers = $this->user_model->getAllCustomers();
+    $all = $this->user_model->count_all_cust();
+
+    $data = array();
+    $no = $_POST['start'];
+    foreach ($customers as $customer) {
+        $no++;
+        $row = array();
+        $row[] = $customer['id'];
+        $row[] = $customer['name'];
+        $row[] = $customer['email'];
+        $row[] = $customer['contact_no'];
+        $row[] = $customer['address'];
+
+        $row[] = '<a href="'.base_url().'admin/editcustomer/'.$customer['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteCustomer('.$customer['id'].');">Delete</a>';
+
+        $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function addcustomer()
+  {
+    // create the data object
+    $data = new stdClass();
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('email', 'Email', 'trim|required|valid_email');
+    $this->form_validation->set_rules('password', 'Password', '');
+    $this->form_validation->set_rules('contact_no', 'Contact Number', 'trim');
+    $this->form_validation->set_rules('address', 'Address', 'trim');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/addcustomer');
+      $this->load->view('footer');
+    } else {
+      $data->email = $this->input->post('email');
+      if ( !empty( $this->input->post('password') ) ) {
+        $data->password = $this->input->post('password');
+      }
+      $data->name = $this->input->post('name');
+      $data->contact_no = $this->input->post('contact_no');
+      $data->address = $this->input->post('address');
+      $data->creation_date = date("Y-m-d H:i:s", strtotime("now"));
+      $data->level = 3;
+      $data->status = 1;
+      if ( $this->user_model->create_user($data) ) {
+        $data->success = "Customer added successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/addcustomer', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/addcustomer', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function editcustomer()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $customer = $this->user_model->get_user($id);
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('email', 'Email', 'trim|required|valid_email');
+    $this->form_validation->set_rules('password', 'Password', '');
+    $this->form_validation->set_rules('contact_no', 'Contact Number', 'trim');
+    $this->form_validation->set_rules('address', 'Address', 'trim');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/editcustomer', $customer);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->email = $this->input->post('email');
+      if ( !empty( $this->input->post('password') ) ) {
+        $data->password = $this->input->post('password');
+      }
+      $data->name = $this->input->post('name');
+      $data->contact_no = $this->input->post('contact_no');
+      $data->address = $this->input->post('address');
+      if ($id = $this->user_model->update_user($data)) {
+        $data->success = "Customer edited successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/editcustomer', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/editcustomer', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function deletecustomer()
+  {
+    $id = $this->uri->segment(3);
+    $this->user_model->deleteuser($id);
+    exit;
+  }
+
+  public function types()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/types');
+    $this->load->view('footer');
+  }
+
+  public function gettype()
+  {
+    $types = $this->type_model->getAllTypes();
+    $all = $this->type_model->count_all();
+
+    $data = array();
+    $no = $_POST['start'];
+    foreach ($types as $type) {
+        $no++;
+        $row = array();
+
+        $row[] = $type['id'];
+        $row[] = $type['name'];
+        $row[] = $type['price'];
+        $row[] = $type['locksmithprice'];
+        $row[] = '<a href="'.base_url().'admin/edittype/'.$type['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteType('.$type['id'].');">Delete</a>';
+        $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function addtype()
+  {
+    // create the data object
+    $data = new stdClass();
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('price', 'Customer Price', 'required');
+    $this->form_validation->set_rules('locksmithprice', 'Locksmith Price', 'required');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/addtype');
+      $this->load->view('footer');
+    } else {
+      $data->name = $this->input->post('name');
+      $data->price = $this->input->post('price');
+      $data->locksmithprice = $this->input->post('locksmithprice');
+      $data->creation_date = date("Y-m-d H:i:s", strtotime("now"));
+      if ( $this->type_model->addtype($data) ) {
+        $data->success = "Type added successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/addtype', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/addtype', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function edittype()
+  {
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $type = $this->type_model->get_type($id);
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('price', 'Customer Price', 'required');
+    $this->form_validation->set_rules('locksmithprice', 'Locksmith Price', 'required');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/edittype', $type);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->name = $this->input->post('name');
+      $data->price = $this->input->post('price');
+      $data->locksmithprice = $this->input->post('locksmithprice');
+      if ($id = $this->type_model->updatetype($data)) {
+        $data->success = "Your profile has been edited successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/edittype', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/edittype', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function deletetype()
+  {
+    $id = $this->uri->segment(3);
+    $this->type_model->deletetype($id);
+    exit;
+  }
+
+  public function orders()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/orders');
+    $this->load->view('footer');
+  }
+
+  public function getorders()
+  {
+    $allorders = $this->order_model->getAllOrders();
+    $all = $this->order_model->count_all();
+    $order_count = count($allorders);
+
+    $data = array();
+    $no = $_POST['start'];
+    foreach ($allorders as $order) {
+        $no++;
+        $row = array();
+        $status = "";
+        $row[] = $order['id'];
+        $row[] = $order['locksmith_name'];
+        $row[] = $order['customer_name'];
+        $row[] = $order['type_name'];
+        $row[] = $order['price'];
+        $row[] = $order['address'];
+
+        if ( $order['status'] == '0' ) {
+          $status = 'Pending';
+        } else if ( $order['status'] == '1' ) {
+          $status = 'Accepted';
+        } else if ( $order['status'] == '2' ) {
+          $status = 'Rejected';
+        } else if ( $order['status'] == '3' ) {
+          $status = 'Completed';
+        }
+        
+        if ( $order['end_date'] == '0000-00-00 00:00:00' ) {
+          $endDate = 'Continue';
+        } else {
+          $endDate = date("m-d-Y", strtotime($order['end_date']));
+        }
+        $row[] = $status;
+        $row[] = date("m-d-Y", strtotime($order['start_date']));
+        $row[] = '<a href="'.base_url().'admin/editorder/'.$order['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteAdminOrder('.$order['id'].');">Delete</a>';
+
+        $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function editorder()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $data->orders = $price = $this->order_model->get_order($id);
+    $data->types = $type = $this->type_model->getAllTypes();
+    $data->locksmiths = $type = $this->user_model->getAllLocksmith();
+    $data->customers = $type = $this->user_model->getAllCustomers();
+
+    // set validation rules
+    $this->form_validation->set_rules('amount', 'Amount', 'required|numeric');
+    //$this->form_validation->set_rules('address', 'Address', 'required');
+    $this->form_validation->set_rules('quantity', 'Quantity', 'numeric');
+    $this->form_validation->set_rules('type_id', 'Type', '');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/editorder', $data);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->amount = $this->input->post('amount');
+      $data->type_id = $this->input->post('type_id');
+      $data->quantity = $this->input->post('quantity');
+      $data->address = $this->input->post('address');
+      $data->customer_id = $this->input->post('customer');
+      $data->locksmith_id = $this->input->post('locksmith');
+      if ($id = $this->order_model->updateorder($data)) {
+        $data->success = "Order updated successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/editorder', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/editorder', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function deleteorder()
+  {
+    $id = $this->uri->segment(3);
+    $this->order_model->deleteorder($id);
+    exit;
+  }
+
+  public function reviews()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/reviews');
+    $this->load->view('footer');
+  }
+
+  public function getreviews()
+  {
+    $allreviews = $this->review_model->getAllReviews();
+    $all = $this->review_model->count_for_all();
+    $review_count = count($allreviews);
+
+    $data = array();
+    $no = $_POST['start'];
+    foreach ($allreviews as $review) {
+        $no++;
+        $row = array();
+        $row[] = $review['id'];
+        $row[] = $review['order_id'];
+        $row[] = $review['locksmith_name'];
+        $row[] = $review['customer_name'];
+        $row[] = $review['review'];
+        $row[] = $review['rating'];
+        $row[] = date("m-d-Y", strtotime($review['creation_date']));
+        $row[] = '<a href="'.base_url().'admin/editreview/'.$review['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteAdminReview('.$review['id'].');">Delete</a>';
+
+        $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function editreview()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $data->reviews = $price = $this->review_model->get_review($id);
+    $data->types = $type = $this->type_model->getAllTypes();
+
+    // set validation rules
+    $this->form_validation->set_rules('review', 'Review', 'required|trim');
+    $this->form_validation->set_rules('rating', 'Rating', 'numeric');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/editreview', $data);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->review = $this->input->post('review');
+      $data->rating = $this->input->post('rating');
+      if ($id = $this->review_model->updatereview($data)) {
+        $data->success = "Review updated successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/editreview', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/editreview', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function deletereview()
+  {
+    $id = $this->uri->segment(3);
+    $this->review_model->deletereview($id);
+    exit;
+  }
+
+  public function pages()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/pages');
+    $this->load->view('footer');
+  }
+
+  public function getpages()
+  {
+    $pages = $this->page_model->getAllpages();
+    $all = $this->page_model->count_all();
+
+    $data = array();
+    $no = $_POST['start'];
+    foreach ($pages as $page) {
+        $type = "Landing page";
+        if ( $page['section'] == 1 )
+          $type = "Section page";
+        $no++;
+        $row = array();
+        $row[] = $page['id'];
+        $row[] = $page['title'];
+        $row[] = $page['slug'];
+        $row[] = $page['description'];
+        $row[] = $type;
+        if ( $page['section'] == 1 ) {
+          $row[] = '<a href="'.base_url().'admin/editpage/'.$page['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteAdminPage('.$page['id'].');">Delete</a> | <a href="'.base_url().'admin/contents/'.$page['id'].'">Contents</a>';
+        } else {
+          $row[] = '<a href="'.base_url().'admin/editpage/'.$page['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteAdminPage('.$page['id'].');">Delete</a>';
+        }
+        $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function addpage()
+  {
+    // create the data object
+    $data = new stdClass();
+
+    // set validation rules
+    $this->form_validation->set_rules('title', 'Title', 'trim|required');
+    $this->form_validation->set_rules('slug', 'Slug', 'trim|required');
+    $this->form_validation->set_rules('section', 'Section', '');
+    $this->form_validation->set_rules('description', 'Description', '');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/addpage');
+      $this->load->view('footer');
+    } else {
+      $data->title = $this->input->post('title');
+      $data->slug = $this->input->post('slug');
+      $data->section = $this->input->post('section');
+      $data->description = $this->input->post('description');
+
+      if ( $id = $this->page_model->addpage($data) ) {
+        $data->success = "Page added successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/addpage', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/addpage', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function editpage()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $customer = $this->page_model->getpage($id);
+
+    // set validation rules
+    $this->form_validation->set_rules('title', 'Title', 'trim|required');
+    $this->form_validation->set_rules('slug', 'Slug', 'trim|required');
+    $this->form_validation->set_rules('section', 'Section', '');
+    $this->form_validation->set_rules('description', 'Description', '');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/editpage', $customer);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->title = $this->input->post('title');
+      $data->slug = $this->input->post('slug');
+      $data->section = $this->input->post('section');
+      $data->description = $this->input->post('description');
+      if ($this->page_model->updatepage($data)) {
+        $data->success = "Page edited successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/editpage', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/editpage', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function deletepage()
+  {
+    $id = $this->uri->segment(3);
+    $this->page_model->deletepage($id);
+    exit;
+  }
+
+  public function contents()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/contents');
+    $this->load->view('footer');
+  }
+
+  public function getcontents()
+  {
+    $id = $this->uri->segment(3);
+    $contents = $this->content_model->getContentsByPage($id);
+    $all = $this->content_model->count_all($id);
+
+    $data = array();
+    $no = $_POST['start'];
+    foreach ($contents as $content) {
+        $no++;
+        $row = array();
+        $row[] = $content['id'];
+        $row[] = $content['name'];
+        $row[] = $content['content_order'];
+        $row[] = $content['description'];
+        $row[] = '<a href="'.base_url().'admin/editcontent/'.$content['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteAdminContent('.$content['id'].');">Delete</a>';
+
+        $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function addcontent()
+  {
+    // create the data object
+    $data = new stdClass();
+    $data->page_id = $page_id = $this->uri->segment(3);
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('content_order', 'Order', 'trim|required');
+    $this->form_validation->set_rules('description', 'Description', '');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/addcontent', $data);
+      $this->load->view('footer');
+    } else {
+      $data->name = $this->input->post('name');
+      $data->content_order = $this->input->post('content_order');
+      $data->description = $this->input->post('description');
+      $data->creation_date = date("Y-m-d H:i:s", strtotime("now"));
+
+      if ( $id = $this->content_model->addcontent($data) ) {
+        $data->success = "Content added successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/addcontent', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/addcontent', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function editcontent()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $customer = $this->content_model->getcontent($id);
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('content_order', 'Order', 'trim|required');
+    $this->form_validation->set_rules('description', 'Description', '');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/editcontent', $customer);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->name = $this->input->post('name');
+      $data->content_order = $this->input->post('content_order');
+      $data->description = $this->input->post('description');
+      if ($this->content_model->updatecontent($data)) {
+        $data->success = "Content edited successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/editcontent', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/editcontent', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function deletecontent()
+  {
+    $id = $this->uri->segment(3);
+    $this->content_model->deletecontent($id);
+    exit;
+  }
+
+  public function coupons()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/coupons');
+    $this->load->view('footer');
+  }
+
+  public function getcoupons()
+  {
+    $coupons = $this->coupon_model->getAllcoupons();
+    $all = $this->coupon_model->count_all();
+
+    $data = array();
+    $no = $_POST['start'];
+    foreach ($coupons as $coupon) {
+        $no++;
+        $row = array();
+        $row[] = $coupon['id'];
+        $row[] = $coupon['name'];
+        $row[] = $coupon['discount'];
+        $row[] = $coupon['count'];
+        $row[] = '<a href="'.base_url().'admin/editcoupon/'.$coupon['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteAdminCoupon('.$coupon['id'].');">Delete</a>';
+
+        $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function addcoupon()
+  {
+    // create the data object
+    $data = new stdClass();
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('discount', 'Discount', 'trim|required');
+    $this->form_validation->set_rules('count', 'Number of Coupon', '');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/addcoupon');
+      $this->load->view('footer');
+    } else {
+      $data->name = $this->input->post('name');
+      $data->discount = $this->input->post('discount');
+      $data->count = $this->input->post('count');
+
+      if ( $id = $this->coupon_model->addcoupon($data) ) {
+        $data->success = "Coupon added successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/addcoupon', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/addcoupon', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function editcoupon()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $customer = $this->coupon_model->getcoupon($id);
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('discount', 'Discount', 'trim|required');
+    $this->form_validation->set_rules('count', 'Number of Coupon', '');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/editcoupon', $customer);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->name = $this->input->post('name');
+      $data->discount = $this->input->post('discount');
+      $data->count = $this->input->post('count');
+      if ($this->coupon_model->updatecoupon($data)) {
+        $data->success = "Coupon edited successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/editcoupon', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/editcoupon', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function deletecoupon()
+  {
+    $id = $this->uri->segment(3);
+    $this->coupon_model->deletecoupon($id);
+    exit;
+  }
+
+  public function services()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/services');
+    $this->load->view('footer');
+  }
+
+  public function getservices()
+  {
+    $allservices = $this->service_model->getAllServices();
+    $service_count = count($allservices);
+
+    $data = array();
+    $no = $_POST['start'];
+    foreach ($allservices as $service) {
+        $no++;
+        $row = array();
+        $row[] = $service['id'];
+        $row[] = $service['name'];
+        $row[] = $service['price'];
+        $row[] = '<a href="'.base_url().'admin/editservice/'.$service['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteAdminService('.$service['id'].');">Delete</a>';
+
+        $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $service_count,
+        "recordsFiltered" => $service_count,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function addservice()
+  {
+    // create the data object
+    $data = new stdClass();
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('price', 'Price', 'required');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/addservice');
+      $this->load->view('footer');
+    } else {
+      $data->name = $this->input->post('name');
+      $data->price = $this->input->post('price');
+
+      if ( $id = $this->service_model->addService($data) ) {
+        $data->success = "Service added successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/addservice', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/addservice', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function editservice()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $customer = $this->service_model->getService($id);
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('price', 'Price', 'required');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/editservice', $customer);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->name = $this->input->post('name');
+      $data->price = $this->input->post('price');
+      if ($this->service_model->updateService($data)) {
+        $data->success = "Service edited successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/editservice', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/editservice', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function deleteservice()
+  {
+    $id = $this->uri->segment(3);
+    $this->service_model->deleteService($id);
+    exit;
+  }
+
+  public function promotions()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/promotions');
+    $this->load->view('footer');
+  }
+
+  public function getpromotions()
+  {
+    $promotions = $this->promotion_model->getAllPromotions();
+    $all = $this->promotion_model->count_all();
+
+    $data = array();
+    $no = $_POST['start'];
+    foreach ($promotions as $promotion) {
+        $no++;
+        $row = array();
+        $row[] = $promotion['id'];
+        $row[] = $promotion['name'];
+        $row[] = $promotion['description'];
+        $row[] = '<a href="'.base_url().'admin/editpromotion/'.$promotion['id'].'">Edit</a> | <a href="javascript:void(0);" onclick="deleteAdminPromotion('.$promotion['id'].');">Delete</a>';
+
+        $data[] = $row;
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function addpromotion()
+  {
+    // create the data object
+    $data = new stdClass();
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('description', 'Description', 'trim');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/addpromotion');
+      $this->load->view('footer');
+    } else {
+      $data->name = $this->input->post('name');
+      $data->description = $this->input->post('description');
+
+      if ( $id = $this->promotion_model->addpromotion($data) ) {
+        $data->success = "Promotion added successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/addpromotion', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/addpromotion', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function editpromotion()
+  {
+    // create the data object
+    $data = new stdClass();
+    $id = $this->uri->segment(3);
+    $customer = $this->promotion_model->getpromotion($id);
+
+    // set validation rules
+    $this->form_validation->set_rules('name', 'Name', 'trim|required');
+    $this->form_validation->set_rules('description', 'Description', 'trim');
+
+    if ($this->form_validation->run() == false) {
+      // validation not ok, send validation errors to the view
+      $this->load->view('header');
+      $this->load->view('admin/editpromotion', $customer);
+      $this->load->view('footer');
+    } else {
+      $data->id = $id;
+      $data->name = $this->input->post('name');
+      $data->description = $this->input->post('description');
+      if ($this->promotion_model->updatepromotion($data)) {
+        $data->success = "Promotion edited successfully.";
+        $this->load->view('header');
+        $this->load->view('admin/editpromotion', $data);
+        $this->load->view('footer');
+      } else {
+        $data->error = "Something wrong here.";
+        $this->load->view('header');
+        $this->load->view('admin/editpromotion', $data);
+        $this->load->view('footer');
+      }
+    }
+  }
+
+  public function deletepromotion()
+  {
+    $id = $this->uri->segment(3);
+    $this->promotion_model->deletepromotion($id);
+    exit;
+  }
+
+  public function transactions()
+  {
+    $this->load->view('header');
+    $this->load->view('admin/transactions');
+    $this->load->view('footer');
+  }
+
+  public function gettransactions()
+  {
+    $id = $this->uri->segment(3);
+    if ( $id == '1' ) {
+      $payments = $this->payment_model->detailPayments(null);
+      $all = $this->payment_model->count_all(null);
+
+      $data = array();
+      $no = $_POST['start'];
+      foreach ($payments as $payment) {
+        $no++;
+        $row = array();
+        $row[] = $payment['id'];
+        $row[] = $payment['locksmith_name'];
+        $row[] = $payment['amount'];
+        $row[] = "Completed";
+        $row[] = date("F", strtotime($payment['creation_date']));
+        $row[] = date("m-d-Y", strtotime($payment['creation_date']));
+
+        $data[] = $row;
+      }
+    } else if ( $id == '2' ) {
+      $payments = $this->order_model->getCompletedOrders(null);
+      $all = $this->order_model->count_all_completed(null);
+
+      $data = array();
+      $no = $_POST['start'];
+      foreach ($payments as $payment) {
+        $no++;
+        $row = array();
+        $row[] = $payment['id'];
+        $row[] = $payment['customer_name'];
+        $row[] = $payment['locksmith_name'];
+        $row[] = $payment['type_name'];
+        $row[] = $payment['price'];
+        $row[] = "Completed";
+        $row[] = date("m-d-Y", strtotime($payment['completed_date']));
+
+        $data[] = $row;
+      }
+    }
+
+    $output = array(
+        "draw" => $_POST['draw'],
+        "recordsTotal" => $all,
+        "recordsFiltered" => $all,
+        "data" => $data,
+    );
+
+    echo json_encode($output);
+  }
+
+  public function password()
+  {
+    $user_id = $this->session->userdata('user_id');
+    $user = $this->user_model->get_user($user_id);
+
+    // create the data object
+    $data = new stdClass();
+
+    $this->form_validation->set_rules('old_pass', 'Old Password', 'trim|required');
+    $this->form_validation->set_rules('new_pass', 'New Password', 'trim|required|min_length[6]');
+    $this->form_validation->set_rules('con_new_pass', 'Confirm New Password', 'trim|required|min_length[6]|matches[new_pass]');
+
+    if ($this->form_validation->run() == false) {
+      $this->load->view('header');
+      $this->load->view('admin/password');
+      $this->load->view('footer');
+    } else {
+      $data2 = new stdClass();
+      $data2->password = $this->input->post("new_pass");
+      $data2->id = $user_id;
+      $this->user_model->update_user($data2);
+
+//      $this->load->library('email');
+//      $this->email->set_mailtype("html");
+//      $this->email->from('info@locksmith.com', 'LockSmith');
+//      $this->email->to($user->email);
+//      $this->email->subject("Your Locksmith account information has been updated");
+//
+//      $message = $this->load->view('email/passwordresetsuccess', array(), true);
+//      $this->email->message($message);
+//      $this->email->send();
+
+      $data->success = 'Your password has been changed.';
+      $this->load->view('header');
+      $this->load->view('admin/password', $data);
+      $this->load->view('footer');
+    }
+  }
+
+  public function edit()
+  {
+    $user_id = $this->session->userdata('user_id');
+    $user = $this->user_model->get_user($user_id);
+
+    // create the data object
+    $data = new stdClass();
+    $data->user = $user;
+
+    $this->form_validation->set_rules('email', 'Email', 'trim|required|valid_email');
+    $this->form_validation->set_rules('contact_no', 'Contact Number', 'trim');
+    $this->form_validation->set_rules('city', 'City', 'trim');
+    $this->form_validation->set_rules('address', 'Address', 'trim');
+
+    if ($this->form_validation->run() == false) {
+      $this->load->view('header');
+      $this->load->view('admin/edit', $data);
+      $this->load->view('footer');
+    } else {
+      $name = $this->input->post('name');
+      $data->id = $user_id;
+      $data->email = $this->input->post('email');
+      $data->name = $name[0] . ' ' . $name[1];
+      $data->contact_no = $this->input->post('contact_no');
+      $data->city = $this->input->post('city');
+      $data->address = $this->input->post('address');
+      $this->user_model->update_user($data);
+      if ( isset( $_FILES['image'] ) && !empty( $_FILES['image'] ) ) {
+        $this->upload();
+      } else {
+        redirect('/admin');
+      }
+    }
+  }
+
+  public function upload()
+  {
+    $user_id = $this->session->userdata('user_id');
+
+    $max = 400;
+    list($width, $height, $type, $attr) = getimagesize( $_FILES['image']['tmp_name'] );
+    if ( $width > $max || $height > $max ) {
+      $target_filename = $_FILES['image']['tmp_name'];
+      $fn = $_FILES['image']['tmp_name'];
+      $size = getimagesize( $fn );
+      $ratio = $size[0]/$size[1];
+      if( $ratio > 1) {
+        $width = $max;
+        $height = $max/$ratio;
+      } else {
+        $width = $max*$ratio;
+        $height = $max;
+      }
+      $src = imagecreatefromstring(file_get_contents($fn));
+      $dst = imagecreatetruecolor( $width, $height );
+      imagecopyresampled($dst, $src, 0, 0, 0, 0, $width, $height, $size[0], $size[1] );
+
+      imagejpeg($dst, $target_filename);
+    }
+
+    $new_name = time().$_FILES["image"]["name"];
+    $uploaddir = "./uploads/user/" . $user_id . "/";
+    $uploadfile = $uploaddir . basename($new_name);
+
+    if ( !file_exists( $uploaddir ) ) {
+      mkdir($uploaddir, 0777, true);
+    }
+
+    if (move_uploaded_file($_FILES['image']['tmp_name'], $uploadfile)) {
+      $data = new stdClass();
+      $data->id = $user_id;
+      $data->image = $new_name;
+      $this->user_model->update_user($data);
+      $this->session->set_userdata(array(
+        'image' => (string) $new_name,
+      ));
+      redirect('/admin');
+    }
+  }
+}
